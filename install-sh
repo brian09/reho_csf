@@ -1,0 +1,108 @@
+#!/bin/bash
+SCRIPT=$0
+SCRIPT_PATH=$(dirname $SCRIPT)
+cd $SCRIPT_PATH
+SCRIPT_PATH=$(pwd)
+args=("$@")
+INSTALL_PATH=$SCRIPT_PATH
+CXX_COMPILER=$(which g++)
+C_COMPILER=$(which gcc)
+SOURCE_PATH=$SCRIPT_PATH/src
+LINK_STATIC=0
+OS="Linux"
+if [[ "$OSTYPE" == "linux-gnu"* ]]
+then
+        OS="Linux"
+elif [[ "$OSTYPE" == "darwin"* ]]
+then
+        OS="Mac"
+
+else
+        echo "Not setup for $OSTYPE build"
+        echo "Only linux-gnu and darwin are accepted operating system"
+        exit 
+fi
+
+
+function help_display {
+ 	echo "Usage: install-sh [Options]"
+ 	echo "Script Options:"
+ 	echo " "
+ 	echo "--install_path <Path to reho_csf installation>"
+ 	echo "Default: $SCRIPT_PATH"
+ 	echo " "
+ 	echo "--cxx_compiler <C++ compiler> Default: $(which g++)"
+ 	echo " " 
+ 	echo "--c_compiler <C compiler> Default: $(which gcc)"
+        echo ""
+ 	echo "Warning: C/C++ compilers must allow openmp"
+        echo ""
+        echo "--static (links image_fourier as static, only posssible on Linux)"
+        echo ""
+
+}
+
+
+for ((i = 0; i < $#; i++ )); do
+	current_arg=${args[$i]}
+
+ if [ "$current_arg" = "--help" ] || [ "$current_arg" = "--help" ]
+ then
+	help_display
+	exit
+ elif [ "$current_arg" = "--install_path" ] && [ $(($i + 1)) -lt $# ] 
+ then
+ 	i=$(($i + 1))
+ 	INSTALL_PATH=${args[$i]}
+ elif [ "$current_arg" = "--cxx_compiler" ] && [ $(($i + 1)) -lt $# ] 
+ then
+ 	i=$(($i + 1))
+ 	CXX_COMPILER=${args[$i]} 
+ 
+ elif [ "$current_arg" = "--c_compiler" ] && [ $(($i + 1)) -lt $# ] 
+ then
+ 	i=$(($i + 1))
+ 	C_COMPILER=${args[$i]}	
+
+ elif [ "$current_arg" = "--static" ]
+ then
+        if [ $OS != "Linux" ]
+        then
+                echo "-static option can only be used on Linux"
+                exit 
+        fi
+        LINK_STATIC=1         
+ else
+ 
+ 	echo "Invalid argument was entered: $current_arg"
+ 	echo "See --help for list of valid arguments"
+ 	exit 
+ fi
+
+done
+if [ ! command -v $CXX_COMPILER &>/dev/null ]
+then
+   echo "C++ compiler not found at $CXX_COMPILER"
+   exit 
+fi
+if [ ! command -v $C_COMPILER &>/dev/null ]
+then
+   echo "C compiler not found at $C_COMPILER"
+   exit 
+fi
+set -eo pipefail
+cd ./src
+rm -f *.o 
+rm -f reho_csf
+$C_COMPILER -w -fopenmp -O2 -c *.c
+$CXX_COMPILER -w -fopenmp -O2 -c *.cpp
+if [ $LINK_STATIC -eq 1 ]
+then
+        $CXX_COMPILER -w -static -O2 -fopenmp -o reho_csf *.o
+else
+        $CXX_COMPILER -w -O2 -fopenmp -o reho_csf *.o
+fi
+rm -f *.o    
+cp ./reho_csf $INSTALL_PATH
+cd ..
+echo "reho_csf has been successfully installed at $INSTALL_PATH"
